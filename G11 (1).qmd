@@ -1,0 +1,182 @@
+---
+title: "project 2"
+author: "Group 11"
+number-sections: true
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+  pdf: default
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r}
+#packages library
+#|echo: false
+library(tidyverse)
+library(moderndive)
+library(gapminder)
+library(sjPlot)
+library(stats)
+library(jtools)
+```
+
+# Data preparing & Cleaning
+
+```{r}
+#data cleaning
+data<-read.csv("dataset11.csv")
+data<-na.omit(data)
+data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Good",1,0) #for "Good"=1 "Poor"=0
+data$Qualityclass <- as.factor(data$Qualityclass)
+data$harvested <- as.factor(data$harvested)
+```
+
+# Illuminating visualizations of the data
+
+```{r}
+library(tidyr)
+#change formula
+data_long <- data %>%
+  pivot_longer(cols = c(aroma,flavor,acidity,category_two_defects,altitude_mean_meters),
+               names_to = "Variable",
+               values_to = "Value")
+library(ggplot2)
+#boxplot
+#continuous
+ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales = "free_y") +  
+  theme_minimal() +
+  labs(title = "Boxplots of 5 variables by quality",
+       x = "qualityclass",
+       y = "Value") +
+  theme(legend.position = "none")
+#categorical
+#option 1
+ggplot(data, aes(x=Qualityclass ,  y = ..prop.., group=harvested, fill=harvested)) + 
+    geom_bar(position="dodge", stat="count") +
+    labs(y = "Proportion")
+#option 2
+ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
+    geom_bar(position="dodge", stat="count") +
+    labs(y = "Proportion")
+```
+
+#Model creating
+original model
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{defects}+
+    \beta_5 \cdot \textrm{meters}+
+    \beta_6 \cdot \textrm{harvested}$$
+optimization model
+(final model)
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{harvested}$$
+
+
+```{r}
+#model fitted
+model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model)
+summ(model)
+#Optimization-del category_two_defects & altitude_mean_meters
+model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+summary(model1)
+summ(model1)
+```
+aroma flavor acidity significant
+
+
+```{r}
+levels(data$Qualityclass) #base on "good"
+#for original model
+mod1coefs <- round(coef(model), 2)
+library(knitr)
+confint(model) %>%
+  kable()
+#for optimization model
+mod1coefs1 <- round(coef(model1), 2)
+library(knitr)
+confint(model1) %>%
+  kable()
+```
+#log-odds
+```{r}
+mod.coef.logodds<-model1 %>%
+                  summary() %>%
+                  coef()
+```
+
+```{r}
+#| figure: fig1
+#| fig-cap: the log-odds of explanatory variables for quality bad
+plot_model(model1, show.values = TRUE, transform = NULL,
+           title = "Log-Odds (quality-bad)", show.p = FALSE)
+```
+
+```{r}
+data<- data%>%
+      mutate(logodds.bad = predict(model1))
+```
+
+#odds
+```{r}
+model1 %>%
+ coef() %>%
+  exp()
+```
+```{r}
+#check value
+exp(coef(model1))
+#odd ratrio for quality bad
+plot_model(model1, show.values = TRUE, axis.lim = c(10,1000),
+           title = "Odds (quality-bad)", show.p = FALSE)
+data<- data%>%
+      mutate(odds.bad = exp(logodds.bad))
+data<- data%>%
+      mutate(prob.bad = fitted(model1))
+```
+#probability
+continuous
+```{r}
+#aroma/acidity/flavor prob
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+data_long1 <- data %>%
+ pivot_longer(cols = c(aroma, flavor,acidity), names_to = "Type", values_to = "Value")
+# plot
+ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
+ geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
+ labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
+ theme_minimal()
+```
+```{r}
+#plot
+par(mfrow=c(1,3))
+plot_model(model1, type = "pred", title = "",
+            axis.title = c("aroma", "Prob. of quality being bad"))
+plot_model(model1, type = "pred", title = "",
+            axis.title = c("flavor", "Prob. of quality being bad"))
+plot_model(model1, type = "pred", title = "",
+            axis.title = c("acidity", "Prob. of quality being bad"))
+```
+
+
