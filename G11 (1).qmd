@@ -13,7 +13,7 @@ header-includes: |
 editor_options: 
   chunk_output_type: console
 execute:
-  echo: true
+  echo: false
   eval: true
   warning: false
   message: false
@@ -32,6 +32,8 @@ library(sjPlot)
 library(stats)
 library(jtools)
 ```
+# Introduction
+(include research question)
 
 # Data preparing & Cleaning
 
@@ -43,9 +45,9 @@ data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Good",1,0) #for "Good"=1 "Po
 data$Qualityclass <- as.factor(data$Qualityclass)
 data$harvested <- as.factor(data$harvested)
 ```
-
+in this dataset aroma,flavor,acidity,category_two_defects and altitude_mean_meters are continuous variables, Qualityclass and harvested are categorical variables.
+#Exploratory Data Analysis
 # Illuminating visualizations of the data
-
 ```{r}
 library(tidyr)
 #change formula
@@ -74,8 +76,14 @@ ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass, fill=Qualitycl
     geom_bar(position="dodge", stat="count") +
     labs(y = "Proportion")
 ```
-
-#Model creating
+#Numerical Summaries
+```{r}
+#summary
+summary(data)
+#####need to add a table for summary use gt()
+```
+#Formal Data Analysis
+#Model fitted
 original model
 $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_2 \cdot \textrm{flavor}+
@@ -83,26 +91,43 @@ $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_4 \cdot \textrm{defects}+
     \beta_5 \cdot \textrm{meters}+
     \beta_6 \cdot \textrm{harvested}$$
+(each variable need to be explain)
+
+```{r}
+#model fitted for original
+model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model)
+summ(model)
+```
+find p-value of category_two_defects and altitude_mean_meters and harvested are higher than 0.05
+```{r}
+#del category_two_defects variale
+model_ctd <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model_ctd)
+summ(model_ctd)
+```
+AIC decreased
+```{r}
+#del altitude_mean_meters variale
+model_amm <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+harvested, data = data, family = binomial(link = "logit"))
+summary(model_amm)
+summ(model_amm)
+```
+AIC decreased
+```{r}
+#del harvested variable
+model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+summary(model1)
+summ(model1)
+####### need a table for summ
+```
+aroma flavor acidity significant this three varibales will be saved and AIC decreased to min.
 optimization model
 (final model)
 $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_2 \cdot \textrm{flavor}+
     \beta_3 \cdot \textrm{acidity}+ 
     \beta_4 \cdot \textrm{harvested}$$
-
-
-```{r}
-#model fitted
-model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
-summary(model)
-summ(model)
-#Optimization-del category_two_defects & altitude_mean_meters
-model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
-summary(model1)
-summ(model1)
-```
-aroma flavor acidity significant
-
 
 ```{r}
 levels(data$Qualityclass) #base on "good"
@@ -117,7 +142,7 @@ library(knitr)
 confint(model1) %>%
   kable()
 ```
-#log-odds
+log-odds
 ```{r}
 mod.coef.logodds<-model1 %>%
                   summary() %>%
@@ -136,7 +161,7 @@ data<- data%>%
       mutate(logodds.bad = predict(model1))
 ```
 
-#odds
+odds
 ```{r}
 model1 %>%
  coef() %>%
@@ -153,7 +178,7 @@ data<- data%>%
 data<- data%>%
       mutate(prob.bad = fitted(model1))
 ```
-#probability
+probability
 continuous
 ```{r}
 #aroma/acidity/flavor prob
@@ -168,15 +193,19 @@ ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
  labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
  theme_minimal()
 ```
+
 ```{r}
+library(grid)
+library(gridExtra)
 #plot
-par(mfrow=c(1,3))
-plot_model(model1, type = "pred", title = "",
+
+plot_model(model1, type = "pred",terms = "aroma" ,title = "Aroma",
             axis.title = c("aroma", "Prob. of quality being bad"))
-plot_model(model1, type = "pred", title = "",
+plot_model(model1, type = "pred", terms="flavor",title = "Flavor",
             axis.title = c("flavor", "Prob. of quality being bad"))
-plot_model(model1, type = "pred", title = "",
+plot_model(model1, type = "pred",terms = "acidity", title = "Acidity",
             axis.title = c("acidity", "Prob. of quality being bad"))
+#merge
+grid.arrange(p1[[1]],p2[[1]],p3[[1]],nrow=1)
+
 ```
-
-
