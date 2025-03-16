@@ -1,19 +1,16 @@
 ---
-title: "project 2"
-author: "Group 11"
+title: "Project 2"
+author: Group 11
 number-sections: true
 format: 
   html:
     embed-resources: true
     code-tools: true
   pdf: default
-header-includes: |
-  \usepackage{fvextra}
-  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 editor_options: 
   chunk_output_type: console
 execute:
-  echo: true
+  echo: false
   eval: true
   warning: false
   message: false
@@ -23,39 +20,40 @@ editor:
 ---
 
 ```{r}
-#packages library
-#|echo: false
+#| echo: true
 library(tidyverse)
 library(moderndive)
 library(gapminder)
 library(sjPlot)
 library(stats)
 library(jtools)
+library(caret)
+library(pROC)
+library(MASS)
 ```
 
-# Data preparing & Cleaning
-
 ```{r}
-#data cleaning
+#| echo: true
 data<-read.csv("dataset11.csv")
 data<-na.omit(data)
-data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Good",1,0) #for "Good"=1 "Poor"=0
+data<-data[data$altitude_mean_meters<100000,]
+write.csv(data,"data.csv",row.names=FALSE)
+summary(data$altitude_mean_meters)
+data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Poor",1,0) #for "Poor"=1 "Good"=0
 data$Qualityclass <- as.factor(data$Qualityclass)
 data$harvested <- as.factor(data$harvested)
 ```
 
-# Illuminating visualizations of the data
+#### We realized that the altitude_mean_meters have two outliers and it higher than the most highest altitude in the world, so we remove the outliers to make the data more reasonable.
 
 ```{r}
+#| echo: true
 library(tidyr)
-#change formula
 data_long <- data %>%
   pivot_longer(cols = c(aroma,flavor,acidity,category_two_defects,altitude_mean_meters),
                names_to = "Variable",
                values_to = "Value")
 library(ggplot2)
-#boxplot
-#continuous
 ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) +
   geom_boxplot() +
   facet_wrap(~Variable, scales = "free_y") +  
@@ -64,119 +62,114 @@ ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) 
        x = "qualityclass",
        y = "Value") +
   theme(legend.position = "none")
-#categorical
-#option 1
-ggplot(data, aes(x=Qualityclass ,  y = ..prop.., group=harvested, fill=harvested)) + 
-    geom_bar(position="dodge", stat="count") +
-    labs(y = "Proportion")
-#option 2
+ggplot(data, aes(x=Qualityclass ,  y =..prop.., group=harvested, fill=harvested)) + 
+  geom_bar(position="dodge", stat="count") +
+  labs(y = "Proportion")
 ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
-    geom_bar(position="dodge", stat="count") +
-    labs(y = "Proportion")
+  geom_bar(position="dodge", stat="count") +
+  labs(y = "Proportion")
 ```
 
-#Model creating
-original model
-$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
-    \beta_2 \cdot \textrm{flavor}+
-    \beta_3 \cdot \textrm{acidity}+ 
-    \beta_4 \cdot \textrm{defects}+
-    \beta_5 \cdot \textrm{meters}+
-    \beta_6 \cdot \textrm{harvested}$$
-optimization model
-(final model)
-$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
-    \beta_2 \cdot \textrm{flavor}+
-    \beta_3 \cdot \textrm{acidity}+ 
-    \beta_4 \cdot \textrm{harvested}$$
-
-
 ```{r}
-#model fitted
-model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
-summary(model)
-summ(model)
-#Optimization-del category_two_defects & altitude_mean_meters
-model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+#| echo: true
+model1<- glm(Qualityclass_dummy ~ country_of_origin+aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
 summary(model1)
 summ(model1)
+model2 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model2)
+summ(model2)
+model3<-glm(Qualityclass_dummy~aroma+flavor+acidity+category_two_defects+altitude_mean_meters,data=data,family=binomial(link="logit"))
+summary(model3)
+summ(model3)
+model4<-glm(Qualityclass_dummy~aroma+flavor+acidity+altitude_mean_meters,data=data,family=binomial(link="logit"))
+summary(model4)
+summ(model4)
+model5<-glm(Qualityclass_dummy~aroma+flavor+acidity+category_two_defects,data=data,family=binomial(link="logit"))
+summary(model5)
+summ(model5)
+model6<-glm(Qualityclass_dummy~aroma+flavor+acidity,data=data,family=binomial(link="logit"))
+summary(model6)
+summ(model6)
 ```
-aroma flavor acidity significant
 
+#### It shows that model 1,2,3,5 should be removed, and we could find that the altitude_mean_meters was significant in model 4, the p-value was 0.0455. So we should consider which model we choose between model 4 and model 6.
 
 ```{r}
-levels(data$Qualityclass) #base on "good"
-#for original model
-mod1coefs <- round(coef(model), 2)
+#| echo: true
+library(broom)
 library(knitr)
-confint(model) %>%
-  kable()
-#for optimization model
-mod1coefs1 <- round(coef(model1), 2)
-library(knitr)
-confint(model1) %>%
-  kable()
-```
-#log-odds
-```{r}
-mod.coef.logodds<-model1 %>%
-                  summary() %>%
-                  coef()
+Models<-c('model1','model2','model3','model4','model5','model6')
+model.comp.values.model1<-glance(model1)
+kable(model.comp.values.model1,digits=2)
+model.comp.values.model2<-glance(model2)
+kable(model.comp.values.model2,digits=2)
+model.comp.values.model3<-glance(model3)
+kable(model.comp.values.model3,digits=2)
+model.comp.values.model4<-glance(model4)
+kable(model.comp.values.model4,digits=2)
+model.comp.values.model5<-glance(model5)
+kable(model.comp.values.model5,digits=2)
+model.comp.values.model6<-glance(model6)
+kable(model.comp.values.model6,digits=2)
+
+
 ```
 
 ```{r}
-#| figure: fig1
-#| fig-cap: the log-odds of explanatory variables for quality bad
-plot_model(model1, show.values = TRUE, transform = NULL,
+#| echo: true
+library(dplyr)
+library(knitr)
+library(jtools)
+model_table <- bind_rows(
+  data.frame(Model = "model1", AIC = AIC(model1, k = 2), BIC = BIC(model1)),
+  data.frame(Model = "model2", AIC = AIC(model2, k = 2), BIC = BIC(model2)),
+  data.frame(Model = "model3", AIC = AIC(model3, k = 2), BIC = BIC(model3)),
+  data.frame(Model = "model4", AIC = AIC(model4, k = 2), BIC = BIC(model4)),
+  data.frame(Model = "model5", AIC = AIC(model5, k = 2), BIC = BIC(model5)),
+  data.frame(Model = "model6", AIC = AIC(model6, k = 2), BIC = BIC(model6))
+)
+
+kable(model_table, digits = 2, caption = "Comparison for the 6 models")
+```
+
+```{r}
+anova(model4,model6,test="Chisq")
+```
+
+#### Above all of six models, we finally choose the model4 for our research, it was the most appropriate model for this research.
+
+```{r}
+#| echo: true
+mod.coef.logodds<-model4 %>%
+  summary() %>%
+  coef()
+plot_model(model4, show.values = TRUE, transform = NULL,
            title = "Log-Odds (quality-bad)", show.p = FALSE)
-```
-
-```{r}
 data<- data%>%
-      mutate(logodds.bad = predict(model1))
-```
-
-#odds
-```{r}
-model1 %>%
- coef() %>%
+  mutate(logodds.bad = predict(model4))
+model4 %>%
+  coef() %>%
   exp()
-```
-```{r}
-#check value
-exp(coef(model1))
-#odd ratrio for quality bad
-plot_model(model1, show.values = TRUE, axis.lim = c(10,1000),
+exp(coef(model4))
+plot_model(model4, show.values = TRUE, axis.lim = c(10,1000),
            title = "Odds (quality-bad)", show.p = FALSE)
 data<- data%>%
-      mutate(odds.bad = exp(logodds.bad))
+  mutate(odds.bad = exp(logodds.bad))
 data<- data%>%
-      mutate(prob.bad = fitted(model1))
-```
-#probability
-continuous
-```{r}
-#aroma/acidity/flavor prob
-library(ggplot2)
-library(tidyr)
-library(dplyr)
+  mutate(prob.bad = fitted(model4))
 data_long1 <- data %>%
- pivot_longer(cols = c(aroma, flavor,acidity), names_to = "Type", values_to = "Value")
-# plot
+  pivot_longer(cols = c(aroma, flavor,acidity,altitude_mean_meters), names_to = "Type", values_to = "Value")
 ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
- geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
- labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
- theme_minimal()
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
+  labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
+  theme_minimal()
+par(mfrow=c(2,2))  # 设置 2 行 2 列的画布
+plot_model(model4, type = "pred", terms = "aroma", 
+           title = "", axis.title = c("Aroma", "Prob. of quality being bad"))
+plot_model(model4, type = "pred", terms = "flavor", 
+           title = "", axis.title = c("Flavor", "Prob. of quality being bad"))
+plot_model(model4, type = "pred", terms = "acidity", 
+           title = "", axis.title = c("Acidity", "Prob. of quality being bad"))
+plot_model(model4, type = "pred", terms = "altitude_mean_meters", 
+           title = "", axis.title = c("Altitude_mean_meters", "Prob. of quality being bad"))
 ```
-```{r}
-#plot
-par(mfrow=c(1,3))
-plot_model(model1, type = "pred", title = "",
-            axis.title = c("aroma", "Prob. of quality being bad"))
-plot_model(model1, type = "pred", title = "",
-            axis.title = c("flavor", "Prob. of quality being bad"))
-plot_model(model1, type = "pred", title = "",
-            axis.title = c("acidity", "Prob. of quality being bad"))
-```
-
-
