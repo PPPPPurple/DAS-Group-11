@@ -151,18 +151,28 @@ model4 %>%
   coef() %>%
   exp()
 exp(coef(model4))
-plot_model(model4, show.values = TRUE, axis.lim = c(10,1000),
+plot_model(model4, show.values = TRUE,
            title = "Odds (quality-bad)", show.p = FALSE)
+```
+```{r}
 data<- data%>%
   mutate(odds.bad = exp(logodds.bad))
 data<- data%>%
   mutate(prob.bad = fitted(model4))
 data_long1 <- data %>%
-  pivot_longer(cols = c(aroma, flavor,acidity,altitude_mean_meters), names_to = "Type", values_to = "Value")
+  pivot_longer(cols = c(aroma, flavor,acidity), names_to = "Type", values_to = "Value")
 ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
   geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
   labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
   theme_minimal()
+```
+```{r}
+ggplot(data = data, aes(x =altitude_mean_meters, y =prob.bad)) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
+  labs(x = "amm", y = "Probability of quality being bad") +
+  theme_minimal()
+```
+```{r}
 par(mfrow=c(2,2))  # 设置 2 行 2 列的画布
 plot_model(model4, type = "pred", terms = "aroma", 
            title = "", axis.title = c("Aroma", "Prob. of quality being bad"))
