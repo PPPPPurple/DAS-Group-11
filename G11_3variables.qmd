@@ -1,0 +1,235 @@
+---
+title: "project 2"
+author: "Group 11"
+number-sections: true
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+  pdf: default
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r}
+#packages library
+#|echo: false
+library(tidyverse)
+library(moderndive)
+library(gapminder)
+library(sjPlot)
+library(stats)
+library(jtools)
+```
+# Introduction
+(include research question)
+
+# Data preparing & Cleaning
+
+```{r}
+#data cleaning
+data<-read.csv("dataset11.csv")
+data<-na.omit(data)
+data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Good",1,0) #for "Good"=1 "Poor"=0
+data$Qualityclass <- as.factor(data$Qualityclass)
+data$harvested <- as.factor(data$harvested)
+data$category_two_defects<-as.factor(data$category_two_defects)
+#Outlier in altitude_mean_meters
+sum(data$altitude_mean_meters>8848)+sum(data$altitude_mean_meters<0)
+data=data%>%
+  filter(data$altitude_mean_meters<8848 & data$altitude_mean_meters>0)
+
+#standarized
+par(mfrow=c(2,2))
+plot(density(data$aroma), col = "blue", main = "Density Plot of Data")
+plot(density(data$flavor), col = "blue", main = "Density Plot of Data")
+plot(density(data$acidity), col = "blue", main = "Density Plot of Data")
+plot(density(data$altitude_mean_meters), col = "blue", main = "Density Plot of Data")
+
+#Min-Max standarized
+min_max_norm=function(x){
+  return((x-min(x))/(max(x)-min(x)))
+}
+data[,2:4]=lapply(data[,2:4],min_max_norm)
+data$altitude_mean_meters=min_max_norm(data$altitude_mean_meters)
+```
+in this dataset aroma,flavor,acidity and altitude_mean_meters are continuous variables, category_two_defects, Qualityclass and harvested are categorical variables.
+#Exploratory Data Analysis
+# Illuminating visualizations of the data
+```{r}
+library(tidyr)
+#change formula
+data_long <- data %>%
+  pivot_longer(cols = c(aroma,flavor,acidity,altitude_mean_meters),
+               names_to = "Variable",
+               values_to = "Value")
+library(ggplot2)
+
+#boxplot
+#continuous
+ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales = "free_y") +  
+  theme_minimal() +
+  labs(title = "Boxplots of 5 variables by quality",
+       x = "qualityclass",
+       y = "Value") +
+  theme(legend.position = "none")
+#categorical
+#category_two_defects
+ggplot(data, aes(x=category_two_defects ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
+    geom_bar(position="dodge", stat="count") +
+    labs(y = "Proportion")
+#harvested
+ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
+    geom_bar(position="dodge", stat="count") +
+    labs(y = "Proportion")
+```
+#Numerical Summaries
+```{r}
+#summary
+summary(data)
+#####need to add a table for summary use gt()
+```
+#Formal Data Analysis
+#Model fitted
+original model
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{defects}+
+    \beta_5 \cdot \textrm{meters}+
+    \beta_6 \cdot \textrm{harvested}$$
+(each variable need to be explain)
+
+```{r}
+#model fitted for original
+model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model)
+summ(model)
+```
+find p-value of category_two_defects and altitude_mean_meters and harvested are higher than 0.05
+```{r}
+#del category_two_defects variale
+model_ctd <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model_ctd)
+summ(model_ctd)
+```
+AIC decreased
+```{r}
+#del altitude_mean_meters variale
+model_0 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters, data = data, family = binomial(link = "logit"))
+summary(model_0)
+summ(model_0)
+```
+AIC decreased
+```{r}
+#del harvested variable
+model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+summary(model1)
+summ(model1)
+####### need a table for summ
+```
+aroma flavor acidity significant this three varibales will be saved and AIC decreased to min.
+optimization model
+(final model)
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{harvested}$$
+########model1
+```{r}
+levels(data$Qualityclass) #base on "good"
+#for original model
+mod1coefs <- round(coef(model), 2)
+library(knitr)
+confint(model) %>%
+  kable()
+#for optimization model
+mod1coefs1 <- round(coef(model1), 2)
+library(knitr)
+confint(model1) %>%
+  kable()
+```
+log-odds
+```{r}
+mod.coef.logodds<-model1 %>%
+                  summary() %>%
+                  coef()
+```
+
+```{r}
+#| figure: fig1
+#| fig-cap: the log-odds of explanatory variables for quality good
+plot_model(model1, show.values = TRUE, transform = NULL,
+           title = "Log-Odds (quality-good)", show.p = FALSE)
+```
+
+```{r}
+data<- data%>%
+      mutate(logodds.good = predict(model1))
+```
+
+odds
+```{r}
+model1 %>%
+ coef() %>%
+  exp()
+```
+```{r}
+#check value
+exp(coef(model1))
+#odd ratrio for quality good
+plot_model(model1, show.values = TRUE,
+           title = "Odds (quality-good)", show.p = FALSE)
+data<- data%>%
+      mutate(odds.good = exp(logodds.good))
+data<- data%>%
+      mutate(prob.good = fitted(model1))
+```
+probability
+continuous
+```{r}
+#aroma/acidity/flavor prob
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+data_long1 <- data %>%
+ pivot_longer(cols = c(aroma, flavor,acidity), names_to = "Type", values_to = "Value")
+# plot
+ggplot(data = data_long1, aes(x =Value, y =prob.good, color = Type)) +
+ geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
+ labs(x = "score", y = "Probability of quality being good", color = "character") +
+ theme_minimal()
+```
+
+```{r}
+library(grid)
+library(gridExtra)
+#plot
+
+p1=plot_model(model1, type = "pred",terms = "aroma" ,title = "Aroma",
+            axis.title = c("aroma", "Prob. of quality being good"))
+p2=plot_model(model1, type = "pred", terms="flavor",title = "Flavor",
+            axis.title = c("flavor", "Prob. of quality being good"))
+p3=plot_model(model1, type = "pred",terms = "acidity", title = "Acidity",
+            axis.title = c("acidity", "Prob. of quality being good"))
+#merge
+grid.arrange(p1,p2,p3,nrow=1)
+
+```
+
+
+
+
