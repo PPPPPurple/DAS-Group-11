@@ -1,5 +1,5 @@
 ---
-title: "project 2"
+title: "Assessing the Impact of Coffee Characteristics on Quality Classification Using GLM"
 author: "Group 11"
 number-sections: true
 format: 
@@ -7,9 +7,6 @@ format:
     embed-resources: true
     code-tools: true
   pdf: default
-header-includes: |
-  \usepackage{fvextra}
-  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 editor_options: 
   chunk_output_type: console
 execute:
@@ -61,10 +58,9 @@ plot(density(data$altitude_mean_meters), col = "blue", main = "Density Plot of D
 min_max_norm=function(x){
   return((x-min(x))/(max(x)-min(x)))
 }
-data[,2:4]=lapply(data[,2:4],min_max_norm)
 data$altitude_mean_meters=min_max_norm(data$altitude_mean_meters)
 ```
-in this dataset aroma,flavor,acidity and altitude_mean_meters are continuous variables, category_two_defects, Qualityclass and harvested are categorical variables.
+In this dataset aroma,flavor,acidity and altitude_mean_meters are continuous variables, category_two_defects, Qualityclass and harvested are categorical variables.
 #Exploratory Data Analysis
 # Illuminating visualizations of the data
 ```{r}
@@ -82,7 +78,7 @@ ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) 
   geom_boxplot() +
   facet_wrap(~Variable, scales = "free_y") +  
   theme_minimal() +
-  labs(title = "Boxplots of 5 variables by quality",
+  labs(title = "Boxplots of 4 variables by quality",
        x = "qualityclass",
        y = "Value") +
   theme(legend.position = "none")
@@ -115,56 +111,81 @@ $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
 
 ```{r}
 #model fitted for original
-model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
-summary(model)
-summ(model)
+model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model1)
+summ(model1)
 ```
-find p-value of category_two_defects and altitude_mean_meters and harvested are higher than 0.05
+It shows p-value of category_two_defects and harvested are higher than 0.05
 ```{r}
 #del category_two_defects variale
-model_ctd <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
-summary(model_ctd)
-summ(model_ctd)
+model2 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model2)
+summ(model2)
 ```
 AIC decreased
 ```{r}
-#del altitude_mean_meters variale
-model_0 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters, data = data, family = binomial(link = "logit"))
-summary(model_0)
-summ(model_0)
+#del harvested variale
+model3 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters, data = data, family = binomial(link = "logit"))
+summary(model3)
+summ(model3)
 ```
 AIC decreased
 ```{r}
 #del harvested variable
-model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
-summary(model1)
-summ(model1)
+model4 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+summary(model4)
+summ(model4)
 ####### need a table for summ
 ```
-aroma flavor acidity significant this three varibales will be saved and AIC decreased to min.
+aroma flavor acidity altitude_mean_meters are both significant these varibales will be saved and AIC decreased to min.
+```{r}
+library(broom)
+library(knitr)
+library(dplyr)
+Models<-c('model1','model2','model3','model4')
+model.comp.values.model1<-glance(model1)
+kable(model.comp.values.model1,digits=2)
+model.comp.values.model2<-glance(model2)
+kable(model.comp.values.model2,digits=2)
+model.comp.values.model3<-glance(model3)
+kable(model.comp.values.model3,digits=2)
+model.comp.values.model4<-glance(model4)
+kable(model.comp.values.model4,digits=2)
+
+model_table <- bind_rows(
+  data.frame(Model = "model1", AIC = AIC(model1, k = 2), BIC = BIC(model1)),
+  data.frame(Model = "model2", AIC = AIC(model2, k = 2), BIC = BIC(model2)),
+  data.frame(Model = "model3", AIC = AIC(model3, k = 2), BIC = BIC(model3)),
+  data.frame(Model = "model4", AIC = AIC(model4, k = 2), BIC = BIC(model4))
+)
+
+kable(model_table, digits = 2, caption = "Comparison for the 4 models")
+```
+(Analysis)
 optimization model
 (final model)
 $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_2 \cdot \textrm{flavor}+
     \beta_3 \cdot \textrm{acidity}+ 
-    \beta_4 \cdot \textrm{harvested}$$
-########model1
+    \beta_4 \cdot \textrm{altitude_mean_meters}$$
+
+##model
 ```{r}
 levels(data$Qualityclass) #base on "good"
 #for original model
-mod1coefs <- round(coef(model), 2)
+mod1coefs <- round(coef(model1), 2)
 library(knitr)
-confint(model) %>%
+confint(model1) %>%
   kable()
 #for optimization model
-mod1coefs_0 <- round(coef(model_0), 2)
+mod1coefs3 <- round(coef(model3), 2)
 library(knitr)
-confint(model_0) %>%
+confint(model3) %>%
   kable()
 ```
 log-odds
 ```{r}
-mod.coef.logodds<-model_0 %>%
+mod.coef.logodds<-model3 %>%
                   summary() %>%
                   coef()
 ```
@@ -172,36 +193,36 @@ mod.coef.logodds<-model_0 %>%
 ```{r}
 #| figure: fig1
 #| fig-cap: the log-odds of explanatory variables for quality good
-plot_model(model_0, show.values = TRUE, transform = NULL,
+plot_model(model3, show.values = TRUE, transform = NULL,
            title = "Log-Odds (quality-good)", show.p = FALSE)
 ```
 
 ```{r}
 data<- data%>%
-      mutate(logodds.good = predict(model_0))
+      mutate(logodds.good = predict(model3))
 ```
 
 odds
 ```{r}
-model_0 %>%
+model3 %>%
  coef() %>%
   exp()
 ```
 ```{r}
 #check value
-exp(coef(model_0))
+exp(coef(model3))
 #odd ratrio for quality good
-plot_model(model_0, show.values = TRUE,
+plot_model(model3, show.values = TRUE, axis.lim=c(0,10000),
            title = "Odds (quality-good)", show.p = FALSE)
 data<- data%>%
       mutate(odds.good = exp(logodds.good))
 data<- data%>%
-      mutate(prob.good = fitted(model_0))
+      mutate(prob.good = fitted(model3))
 ```
 probability
 continuous
 ```{r}
-#aroma/acidity/flavor prob
+#aroma/acidity/flavor/altitude_mean_meters prob
 library(ggplot2)
 library(tidyr)
 library(dplyr)
@@ -223,13 +244,13 @@ library(grid)
 library(gridExtra)
 #plot
 
-p1=plot_model(model_0, type = "pred",terms = "aroma" ,title = "Aroma",
+p1=plot_model(model3, type = "pred",terms = "aroma" ,title = "Aroma",
             axis.title = c("aroma", "Prob. of quality being good"))
-p2=plot_model(model_0, type = "pred", terms="flavor",title = "Flavor",
+p2=plot_model(model3, type = "pred", terms="flavor",title = "Flavor",
             axis.title = c("flavor", "Prob. of quality being good"))
-p3=plot_model(model_0, type = "pred",terms = "acidity", title = "Acidity",
+p3=plot_model(model3, type = "pred",terms = "acidity", title = "Acidity",
             axis.title = c("acidity", "Prob. of quality being good"))
-p4=plot_model(model_0, type = "pred",terms = "altitude_mean_meters", title = "altitude_mean_meters",
+p4=plot_model(model3, type = "pred",terms = "altitude_mean_meters", title = "altitude_mean_meters",
             axis.title = c("altitude_mean_meters", "Prob. of quality being good"))
 #merge
 grid.arrange(p1,p2,p3,p4,nrow=2)
