@@ -29,7 +29,9 @@ library(sjPlot)
 library(stats)
 library(jtools)
 ```
+
 # Introduction
+
 (include research question)
 
 # Data preparing & Cleaning
@@ -41,7 +43,7 @@ data<-na.omit(data)
 data$Qualityclass_dummy<-ifelse(data$Qualityclass=="Good",1,0) #for "Good"=1 "Poor"=0
 data$Qualityclass <- as.factor(data$Qualityclass)
 data$harvested <- as.factor(data$harvested)
-data$category_two_defects<-as.factor(data$category_two_defects)
+data$category_two_defects<-as.numeric(data$category_two_defects)
 #Outlier in altitude_mean_meters
 sum(data$altitude_mean_meters>8848)+sum(data$altitude_mean_meters<0)
 data=data%>%
@@ -49,10 +51,10 @@ data=data%>%
 
 #standarized
 par(mfrow=c(2,2))
-plot(density(data$aroma), col = "blue", main = "Density Plot of Data")
-plot(density(data$flavor), col = "blue", main = "Density Plot of Data")
-plot(density(data$acidity), col = "blue", main = "Density Plot of Data")
-plot(density(data$altitude_mean_meters), col = "blue", main = "Density Plot of Data")
+plot(density(data$aroma), col = "blue", main = "Density Plot of aroma")
+plot(density(data$flavor), col = "blue", main = "Density Plot of flavor")
+plot(density(data$acidity), col = "blue", main = "Density Plot of acidity")
+plot(density(data$altitude_mean_meters), col = "blue", main = "Density Plot of altitude_mean_meters")
 
 #Min-Max standarized
 min_max_norm=function(x){
@@ -60,14 +62,20 @@ min_max_norm=function(x){
 }
 data$altitude_mean_meters=min_max_norm(data$altitude_mean_meters)
 ```
-In this dataset aroma,flavor,acidity and altitude_mean_meters are continuous variables, category_two_defects, Qualityclass and harvested are categorical variables.
-#Exploratory Data Analysis
-# Illuminating visualizations of the data
+
+-   In this dataset, aroma,flavor,acidity and altitude_mean_meters and category_two_defects are continuous variables, Qualityclass and harvested are categorical variables.
+
+-   Through the four density plot, it shows that the first three plot nearly obey Normal distribution, but the plot of altitudes ..( complement ).
+    Then we decide to scale the variable of altitudes.
+
+    #Exploratory Data Analysis# Illuminating visualizations of the data
+
 ```{r}
 library(tidyr)
 #change formula
 data_long <- data %>%
-  pivot_longer(cols = c(aroma,flavor,acidity,altitude_mean_meters),
+  pivot_longer(cols = c(aroma,flavor,acidity,category_two_defects,
+                        altitude_mean_meters),
                names_to = "Variable",
                values_to = "Value")
 library(ggplot2)
@@ -78,36 +86,39 @@ ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass)) 
   geom_boxplot() +
   facet_wrap(~Variable, scales = "free_y") +  
   theme_minimal() +
-  labs(title = "Boxplots of 4 variables by quality",
+  labs(title = "Boxplots of 5 variables by quality",
        x = "qualityclass",
        y = "Value") +
   theme(legend.position = "none")
 #categorical
-#category_two_defects
-ggplot(data, aes(x=category_two_defects ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
-    geom_bar(position="dodge", stat="count") +
-    labs(y = "Proportion")
 #harvested
 ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass, fill=Qualityclass)) + 
     geom_bar(position="dodge", stat="count") +
     labs(y = "Proportion")
 ```
+
+-   The four boxplot
+
+-   The plot of harvested...
+
 #Numerical Summaries
+
 ```{r}
 #summary
 summary(data)
 #####need to add a table for summary use gt()
 ```
-#Formal Data Analysis
-#Model fitted
-original model
+
+# Formal Analysis and Model Selection
+
 $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_2 \cdot \textrm{flavor}+
     \beta_3 \cdot \textrm{acidity}+ 
     \beta_4 \cdot \textrm{defects}+
-    \beta_5 \cdot \textrm{meters}+
+    \beta_5 \cdot \textrm{altitudes}+
     \beta_6 \cdot \textrm{harvested}$$
-(each variable need to be explain)
+
+-   (each variable need to be explain)
 
 ```{r}
 #model fitted for original
@@ -115,21 +126,29 @@ model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+alt
 summary(model1)
 summ(model1)
 ```
-It shows p-value of category_two_defects and harvested are higher than 0.05
+
+-   It shows p-value of category_two_defects and harvested are higher than 0.05
+
 ```{r}
 #del category_two_defects variale
 model2 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
 summary(model2)
 summ(model2)
 ```
-AIC decreased
+
+-   AIC decreased
+
 ```{r}
 #del harvested variale
 model3 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters, data = data, family = binomial(link = "logit"))
 summary(model3)
 summ(model3)
 ```
-AIC decreased
+
+-   AIC decreased
+
+-   We see that the coefficient for....
+
 ```{r}
 #del harvested variable
 model4 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
@@ -137,7 +156,7 @@ summary(model4)
 summ(model4)
 ####### need a table for summ
 ```
-aroma flavor acidity altitude_mean_meters are both significant these varibales will be saved and AIC decreased to min.
+
 ```{r}
 library(broom)
 library(knitr)
@@ -161,19 +180,22 @@ model_table <- bind_rows(
 
 kable(model_table, digits = 2, caption = "Comparison for the 4 models")
 ```
-(Analysis)
-optimization model
-(final model)
+
+-   It shows aroma, flavor, acidity, altitude_mean_meters are both significant these varibales will be saved and AIC decreased to min.
+
+# (Analysis) optimization model (final model)
+
 $$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
     \beta_2 \cdot \textrm{flavor}+
     \beta_3 \cdot \textrm{acidity}+ 
-    \beta_4 \cdot \textrm{altitude_mean_meters}$$
+    \beta_4 \cdot \textrm{altitudes}$$
 
-##model
+-   (elements explains)
+
 ```{r}
 levels(data$Qualityclass) #base on "good"
 #for original model
-mod1coefs <- round(coef(model1), 2)
+mod1coefs1 <- round(coef(model1), 2)
 library(knitr)
 confint(model1) %>%
   kable()
@@ -183,7 +205,9 @@ library(knitr)
 confint(model3) %>%
   kable()
 ```
-log-odds
+
+### log-odds
+
 ```{r}
 mod.coef.logodds<-model3 %>%
                   summary() %>%
@@ -191,8 +215,8 @@ mod.coef.logodds<-model3 %>%
 ```
 
 ```{r}
-#| figure: fig1
 #| fig-cap: the log-odds of explanatory variables for quality good
+#| figure: fig1
 plot_model(model3, show.values = TRUE, transform = NULL,
            title = "Log-Odds (quality-good)", show.p = FALSE)
 ```
@@ -202,12 +226,16 @@ data<- data%>%
       mutate(logodds.good = predict(model3))
 ```
 
-odds
+-   Log-odds plot shows.....
+
+### odds
+
 ```{r}
 model3 %>%
  coef() %>%
   exp()
 ```
+
 ```{r}
 #check value
 exp(coef(model3))
@@ -219,8 +247,11 @@ data<- data%>%
 data<- data%>%
       mutate(prob.good = fitted(model3))
 ```
-probability
-continuous
+
+-    We interpret the odds ratios as follows:....
+
+### probability continuous
+
 ```{r}
 #aroma/acidity/flavor/altitude_mean_meters prob
 library(ggplot2)
@@ -257,6 +288,12 @@ grid.arrange(p1,p2,p3,p4,nrow=2)
 
 ```
 
+# Conclusion
 
+-   1 Finally, we choose Model 3....
 
+-   2 Through the log-odds and odds ratio plots, flavor was the most important factor in this research....
 
+-   3....
+
+-   4....
