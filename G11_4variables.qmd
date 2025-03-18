@@ -31,9 +31,9 @@ library(jtools)
 ```
 
 # Introduction
-
-(include research question)
-
+-  Coffee quality assessment is a crucial aspect of the coffee industry, impacting both market value and consumer preferences. This study aims to explore the factors that influence whether a batch of coffee is classified as "Good" or "Poor", using data from the Coffee Quality Database (CQD).
+-  The dataset includes moren than 1000 coffee samples from different countries and records sensory attributes (aroma, flavor, and acidity), production characteristics (harvest year, altitude), and defect counts. The coffee batches are assigned a quality classification based on an overall score threshold (≥82.5 as "Good", <82.5 as "Poor").
+-  The primary goal of this study is to analyze the relationship between coffee quality and factors mentioned above, especially the sensory attributes(aroma, flavor, and acidity).
 # Data preparing & Cleaning
 
 ```{r}
