@@ -20,6 +20,7 @@ execute:
   warning: false
   message: false
 ---
+
 ```{r}
 #| echo: false
 #| label: libraries
@@ -38,11 +39,12 @@ library(grid)
 library(gridExtra)
 library(patchwork)
 ```
+
 # Introduction {#sec-Intro}
 
 Coffee quality assessment is a crucial aspect of the coffee industry, impacting both market value and consumer preferences. This study aims to explore the factors that influence whether a batch of coffee is classified as "Good" or "Poor", using data from the Coffee Quality Database (CQD).
 
-The dataset includes moren than 1000 coffee samples from different countries and records sensory attributes (aroma, flavor, and acidity), production characteristics (harvest year, altitude), and defect counts. The coffee batches are assigned a quality classification based on an overall score threshold (≥82.5 as "Good", \<82.5 as "Poor").
+The dataset includes more than 1000 coffee samples from different countries and records sensory attributes (aroma, flavor, and acidity), production characteristics (harvest year, altitude), and defect counts. The coffee batches are assigned a quality classification based on an overall score threshold (≥82.5 as "Good", \<82.5 as "Poor").
 
 The primary goal of this study is to analyze the relationship between coffee quality and factors mentioned above, especially the sensory attributes(aroma, flavor, and acidity).
 
@@ -65,6 +67,8 @@ data=data%>%
 data$altitude_mean_meters=data$altitude_mean_meters/1000
 ```
 
+After handling missing values and filtering altitude outliers, the data cleaning process resulted in a robust dataset suitable for modeling. The altitude variable (altitude_mean_meters) initially showed unrealistic values, such as extreme altitudes over 8,848 meters (the height of Mount Everest), which are highly unlikely for coffee cultivation. Filtering these anomalies ensures subsequent analyses reflect realistic conditions.
+
 ```{r}
 #| label: fig-1
 #| fig-cap: the density of explanatory variables
@@ -77,6 +81,8 @@ plot(density(data$flavor), col = "blue", main = "Density Plot of flavor")
 plot(density(data$acidity), col = "blue", main = "Density Plot of acidity")
 plot(density(data$altitude_mean_meters), col = "blue", main = "Density Plot of altitude_mean_meters")
 ```
+
+The density plots indicate that aroma, flavor, and acidity follow approximate normal distributions with a central peak around a score of 7.5. These sensory characteristics appear consistently rated across samples, suggesting they are stable attributes within coffee quality assessments. In contrast, the distribution of altitude_mean_meters exhibits strong right-skewness, indicating that while most coffees originate from relatively moderate altitudes, a few originate from significantly higher altitudes. This skewness justifies scaling or standardizing this variable before modeling to mitigate potential distortions in regression results.
 
 In this dataset, aroma,flavor,acidity and altitude_mean_meters and category_two_defects are continuous variables, Qualityclass and harvested are categorical variables. Through the four density plot, it shows that the first three plot nearly obey Normal distribution, but the plot of altitudes ..( complement ). Then we decide to scale the variable of altitudes.
 
@@ -103,6 +109,8 @@ ggplot(data = data_long, aes(x = Qualityclass, y = Value, fill = Qualityclass))+
   theme(legend.position = "none")
 ```
 
+The boxplots reveal clear differences between the Good and Poor coffee classes. Coffees classified as "Good" consistently have higher median scores in sensory characteristics (aroma, flavor, and acidity) compared to those classified as "Poor". Notably, flavor and aroma exhibit minimal overlap between categories, highlighting their crucial roles in quality assessment. Additionally, the distribution of category_two_defects demonstrates that lower defect counts correlate strongly with higher quality classifications, suggesting defect management is essential in improving coffee quality. The altitude_mean_meters variable shows less pronounced differences between classes, implying altitude alone may not be a decisive factor for coffee quality.
+
 ```{r}
 #| label: fig-3
 #| fig-cap: the boxplot of continuous explanatory variables
@@ -112,18 +120,22 @@ ggplot(data, aes(x=harvested ,  y = ..prop.., group=Qualityclass,
     labs(y = "Proportion")
 ```
 
--   The four boxplot
-
--   The plot of harvested...
+This bar plot illustrates yearly variations in coffee quality from 2010 to 2018. Notably, higher proportions of "Good" coffee occur during the harvest years of 2014 to 2016, suggesting potential improvements in growing conditions or processing methods during this period. Conversely, the years 2012 and 2013 exhibit higher proportions of "Poor" quality coffee, indicating possible unfavorable conditions or practices. These temporal fluctuations highlight the potential impact of external factors such as climatic conditions, agricultural practices, or technological advancements on coffee quality.
 
 ## Numerical Summaries
 
 ```{r}
-#summary
 #| label: tbl-1
-#| tbl-cap: the summary of dataset 
-summary(data)
-#####need to add a table for summary use gt()
+#| tbl-cap: "Summary Statistics of Coffee Characteristics"
+
+library(gt)
+
+data %>%
+  select(aroma, flavor, acidity, altitude_mean_meters, category_two_defects) %>%
+  summary() %>%
+  as.data.frame() %>%
+  gt() %>%
+  tab_header(title = "Summary Statistics of Coffee Characteristics")
 ```
 
 # Formal Data Analysis {#sec-FDA}
@@ -240,7 +252,7 @@ plot_model(model3, show.values = TRUE, transform = NULL,
            show.p = FALSE)
 ```
 
--   Log-odds plot shows.....
+The log-odds plot clearly indicates that higher scores for sensory attributes (aroma, flavor, acidity) significantly increase the likelihood of coffee being classified as "Good." Specifically, positive coefficients suggest that even incremental improvements in these attributes can substantially boost coffee quality assessments. In contrast, a higher number of category_two_defects dramatically reduces coffee quality, confirming defects as a critical negative determinant of coffee quality classification. The relatively smaller coefficient for altitude_mean_meters indicates that altitude's direct effect on coffee quality is comparatively minor.
 
 ### odds
 
@@ -250,10 +262,11 @@ model3 %>%
   exp()
 #check value
 exp(coef(model3))
-data<- data%>%
-      mutate(odds.good = exp(logodds.good))
-data<- data%>%
-      mutate(prob.good = fitted(model3))
+data <- data %>%
+  mutate(
+    odds.good = exp(logodds.good),
+    prob.good = fitted(model3)
+  )
 ```
 
 ```{r}
@@ -265,7 +278,7 @@ plot_model(model3, show.values = TRUE, axis.lim=c(0,10000),
            show.p = FALSE)
 ```
 
--   We interpret the odds ratios as follows:....
+The odds ratio plot highlights that among all explanatory variables, flavor emerges as the strongest predictor of coffee quality, exhibiting the highest odds ratio. This implies that an incremental increase in flavor rating significantly multiplies the odds of a coffee being classified as "Good." Aroma and acidity also positively influence coffee quality, albeit to a lesser extent. The odds ratio for altitude_mean_meters is close to unity, reinforcing earlier insights that altitude alone minimally influences quality classification. These findings underscore sensory attributes as key drivers in coffee quality improvement strategies.
 
 ### probability continuous
 
@@ -293,6 +306,8 @@ ggplot(data = data, aes(x =altitude_mean_meters, y =prob.good)) +
  theme_minimal()
 ```
 
+These probability curves further detail the predictive relationships between explanatory variables and coffee quality. The curves for sensory attributes (aroma, flavor, and acidity) exhibit clear upward trends, indicating a steep increase in the probability of achieving "Good" quality with higher sensory scores. For instance, coffees scoring above approximately 7.5 in flavor have probabilities exceeding 90% of being classified as "Good." Conversely, the curve for altitude (altitude_mean_meters) appears relatively flat, suggesting altitude plays a limited role in predicting coffee quality once sensory attributes are considered.
+
 ```{r}
 #| label: fig-8
 #| fig-cap: Probility of quality being good
@@ -311,12 +326,14 @@ p4=plot_model(model3, type = "pred",terms = "altitude_mean_meters", title = "alt
 grid.arrange(p1,p2,p3,p4,nrow=2)
 ```
 
+The combined probability prediction plots consolidate previous findings. The steep slopes observed for flavor underscore its critical role in influencing coffee quality—small improvements in flavor ratings significantly enhance the likelihood of achieving "Good" quality. Similarly, aroma and acidity demonstrate positive yet slightly less pronounced impacts. The plot for altitude_mean_meters remains relatively flat, reinforcing its limited predictive power for coffee quality. These visualizations emphasize that prioritizing the enhancement of sensory characteristics, especially flavor, will be most effective in raising coffee quality assessments.
+
 # Conclusions {#sec-Conc}
 
--   1 Finally, we choose Model 3....
+-   1 Sensory Attributes as Key Factors: Among all evaluated factors, sensory attributes—especially flavor, followed closely by aroma and acidity—are the strongest determinants of coffee quality. These findings suggest prioritizing improvements in these areas could substantially enhance overall coffee quality.
 
--   2 Through the log-odds and odds ratio plots, flavor was the most important factor in this research....
+-   2 Impact of Defects: The number of category-two defects negatively affects coffee quality significantly. Implementing rigorous quality-control measures to minimize defects can therefore markedly improve coffee quality classifications.
 
--   3....
+-   3 Limited Influence of Altitude: The altitude at which coffee is grown has a relatively modest effect on quality classifications once sensory attributes are accounted for. While altitude can influence certain sensory characteristics indirectly, it should not be considered a standalone predictor of quality.
 
--   4....
+-   4 Yearly Variations: The observed fluctuations in coffee quality across different harvest years indicate external factors such as climatic variations, agricultural practices, and processing techniques significantly influence coffee quality. Future research might explore these factors in more depth to uncover underlying causes for such temporal variability.
