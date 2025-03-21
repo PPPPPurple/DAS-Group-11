@@ -169,7 +169,7 @@ summ(model1)
 ```
 
 -   It shows p-value of category_two_defects and harvested are higher than 0.05\
-\
+
 -   Model selection strategy:\
 1. Remove insignificant variables(p-value>=0.05).\
 2. Compare the AIC and BIC values between different models to find the optimal model.
@@ -192,7 +192,6 @@ summ(model3)
 
 -   AIC decreased
 
--   We see that the coefficient for....
 
 ```{r}
 #del altitude_mean_meters variable
