@@ -31,6 +31,8 @@ library(caret)
 library(pROC)
 library(MASS)
 ```
+# Introduction
+(include research question)
 
 ```{r}
 #| echo: true
@@ -44,7 +46,13 @@ data$Qualityclass <- as.factor(data$Qualityclass)
 data$harvested <- as.factor(data$harvested)
 ```
 
+
 #### We realized that the altitude_mean_meters have two outliers and it higher than the most highest altitude in the world, so we remove the outliers to make the data more reasonable.
+
+
+in this dataset aroma,flavor,acidity,category_two_defects and altitude_mean_meters are continuous variables, Qualityclass and harvested are categorical variables.
+#Exploratory Data Analysis
+# Illuminating visualizations of the data
 
 ```{r}
 #| echo: true
@@ -94,10 +102,65 @@ summ(model6)
 
 #### It shows that model 1,2,3,5 should be removed, and we could find that the altitude_mean_meters was significant in model 4, the p-value was 0.0455. So we should consider which model we choose between model 4 and model 6.
 
+#Numerical Summaries
+```{r}
+#summary
+summary(data)
+#####need to add a table for summary use gt()
+```
+#Formal Data Analysis
+#Model fitted
+original model
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{defects}+
+    \beta_5 \cdot \textrm{meters}+
+    \beta_6 \cdot \textrm{harvested}$$
+(each variable need to be explain)
+
+```{r}
+#model fitted for original
+model <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+category_two_defects+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model)
+summ(model)
+```
+find p-value of category_two_defects and altitude_mean_meters and harvested are higher than 0.05
+```{r}
+#del category_two_defects variale
+model_ctd <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+altitude_mean_meters+harvested, data = data, family = binomial(link = "logit"))
+summary(model_ctd)
+summ(model_ctd)
+```
+AIC decreased
+```{r}
+#del altitude_mean_meters variale
+model_amm <- glm(Qualityclass_dummy ~ aroma+flavor+acidity+harvested, data = data, family = binomial(link = "logit"))
+summary(model_amm)
+summ(model_amm)
+```
+AIC decreased
+```{r}
+#del harvested variable
+model1 <- glm(Qualityclass_dummy ~ aroma+flavor+acidity, data = data, family = binomial(link = "logit"))
+summary(model1)
+summ(model1)
+####### need a table for summ
+```
+aroma flavor acidity significant this three varibales will be saved and AIC decreased to min.
+optimization model
+(final model)
+$$\ln\left(\frac{p}{1-p}\right) = \alpha + \beta_1 \cdot \textrm{aroma} +
+    \beta_2 \cdot \textrm{flavor}+
+    \beta_3 \cdot \textrm{acidity}+ 
+    \beta_4 \cdot \textrm{harvested}$$
+
+
 ```{r}
 #| echo: true
 library(broom)
 library(knitr)
+
 Models<-c('model1','model2','model3','model4','model5','model6')
 model.comp.values.model1<-glance(model1)
 kable(model.comp.values.model1,digits=2)
@@ -112,6 +175,16 @@ kable(model.comp.values.model5,digits=2)
 model.comp.values.model6<-glance(model6)
 kable(model.comp.values.model6,digits=2)
 
+
+
+confint(model1) %>%
+  kable()
+```
+log-odds
+```{r}
+mod.coef.logodds<-model1 %>%
+                  summary() %>%
+                  coef()
 
 ```
 
@@ -136,7 +209,11 @@ kable(model_table, digits = 2, caption = "Comparison for the 6 models")
 anova(model4,model6,test="Chisq")
 ```
 
+
 #### Above all of six models, we finally choose the model4 for our research, it was the most appropriate model for this research.
+
+
+odds
 
 ```{r}
 #| echo: true
@@ -158,7 +235,19 @@ plot_model(model4, show.values = TRUE,
 data<- data%>%
   mutate(odds.bad = exp(logodds.bad))
 data<- data%>%
+
   mutate(prob.bad = fitted(model4))
+
+      mutate(prob.bad = fitted(model1))
+```
+probability
+continuous
+```{r}
+#aroma/acidity/flavor prob
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
 data_long1 <- data %>%
   pivot_longer(cols = c(aroma, flavor,acidity), names_to = "Type", values_to = "Value")
 ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
@@ -166,7 +255,9 @@ ggplot(data = data_long1, aes(x =Value, y =prob.bad, color = Type)) +
   labs(x = "score", y = "Probability of quality being bad", color = "character Type") +
   theme_minimal()
 ```
+
 ```{r}
+
 ggplot(data = data, aes(x =altitude_mean_meters, y =prob.bad)) +
   geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
   labs(x = "amm", y = "Probability of quality being bad") +
@@ -182,4 +273,19 @@ plot_model(model4, type = "pred", terms = "acidity",
            title = "", axis.title = c("Acidity", "Prob. of quality being bad"))
 plot_model(model4, type = "pred", terms = "altitude_mean_meters", 
            title = "", axis.title = c("Altitude_mean_meters", "Prob. of quality being bad"))
+
+library(grid)
+library(gridExtra)
+#plot
+
+plot_model(model1, type = "pred",terms = "aroma" ,title = "Aroma",
+            axis.title = c("aroma", "Prob. of quality being bad"))
+plot_model(model1, type = "pred", terms="flavor",title = "Flavor",
+            axis.title = c("flavor", "Prob. of quality being bad"))
+plot_model(model1, type = "pred",terms = "acidity", title = "Acidity",
+            axis.title = c("acidity", "Prob. of quality being bad"))
+#merge
+grid.arrange(p1[[1]],p2[[1]],p3[[1]],nrow=1)
+
+
 ```
